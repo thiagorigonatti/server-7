@@ -24,9 +24,6 @@ namespace Server7
 
         [JsonProperty("avatarmedium")]
         public string Avatar { get; set; }
-
-        [JsonProperty("loccountrycode")]
-        public string Country { get; set; }
     }
 
     public class SteamResponse
@@ -43,8 +40,11 @@ namespace Server7
 
     internal class Bot
     {
-        private static HttpClient httpClient;
-        public static DiscordSocketClient client;
+        public static readonly HttpClient STATIC_HTTP_CLIENT = new HttpClient();
+
+        public static DiscordSocketClient discordClient;
+
+        private static readonly HttpMethod PATCH = new HttpMethod("PATCH");
 
         private async Task RegisterCommandsAsync()
         {
@@ -64,9 +64,9 @@ namespace Server7
                     .WithDefaultMemberPermissions(GuildPermission.ManageGuild)
                     .Build();
 
-                client.SlashCommandExecuted += HandleInteractionAsync;
+                discordClient.SlashCommandExecuted += HandleInteractionAsync;
 
-                var channel = client.GetChannel(Server7.settings.ChatChannelId) as SocketTextChannel;
+                var channel = discordClient.GetChannel(Server7.settings.ChatChannelId) as SocketTextChannel;
 
                 await channel.Guild.CreateApplicationCommandAsync(to);
                 await channel.Guild.CreateApplicationCommandAsync(shutdown);
@@ -156,14 +156,14 @@ namespace Server7
                     GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildIntegrations | GatewayIntents.GuildMessages
                 };
 
-                client = new DiscordSocketClient(config);
+                discordClient = new DiscordSocketClient(config);
 
-                client.Log += Log2;
-                client.Ready += OnReadyAsync;
+                discordClient.Log += Log2;
+                discordClient.Ready += OnReadyAsync;
 
-                await client.LoginAsync(TokenType.Bot, token);
-                await client.StartAsync();
-                await client.SetCustomStatusAsync(Server7.settings.StartMessage);
+                await discordClient.LoginAsync(TokenType.Bot, token);
+                await discordClient.StartAsync();
+                await discordClient.SetCustomStatusAsync(Server7.settings.StartMessage);
             }
             catch (Exception ex)
             {
@@ -189,9 +189,7 @@ namespace Server7
         {
             try
             {
-                httpClient = new HttpClient();
-
-                HttpResponseMessage response = await GetAsync(httpClient, "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key="
+                HttpResponseMessage response = await GetAsync("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key="
                     + Server7.settings.SteamWebApiKey + "&steamids=" + steamId);
 
                 if (response.IsSuccessStatusCode)
@@ -219,42 +217,32 @@ namespace Server7
             }
         }
 
-        public static async void SetAppDescription()
+        public static async void SetAppDescription(HttpClient discordHttpClient, StringContent content)
         {
             try
             {
-                httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", Server7.settings.BotToken);
-
-                var requestBody = new
-                {
-                    description = "Developed by TheCoders™:\nhttps://discord.gg/ntaUvVKYRC"
-                };
-
-                var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
-
-                if (client == null)
+                if (discordClient == null)
                     return;
 
-                await PatchAsync(httpClient, "https://discord.com/api/v9/applications/" + client.CurrentUser.Id, content);
+                await PatchAsync(discordHttpClient, "https://discord.com/api/v9/applications/" + discordClient.CurrentUser.Id, content);
             }
             catch (Exception ex)
             {
                 Server7.cts.Cancel();
                 Log.Error($"SetAppDescription Exception: {ex.Message}");
                 Log.Error("This may be happened due to an invalid BotToken in Server7/Config/settings.json");
-                Log.Error("Shutting Down Now.");
+                Log.Error("ShuttingDown Now.");
                 new TelnetClient("localhost", Server7.telnetPort).Shutdown7d2dServer(Server7.telnetPassword);
             }
         }
 
-        private static async Task<HttpResponseMessage> GetAsync(HttpClient client, string requestUri)
+        private static async Task<HttpResponseMessage> GetAsync(string requestUri)
         {
             try
             {
-                var requestMessage = new HttpRequestMessage(new HttpMethod("GET"), requestUri);
+                var requestMessage = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
-                return await client.SendAsync(requestMessage);
+                return await STATIC_HTTP_CLIENT.SendAsync(requestMessage);
             }
             catch (Exception ex)
             {
@@ -263,16 +251,16 @@ namespace Server7
             }
         }
 
-        private static async Task<HttpResponseMessage> PatchAsync(HttpClient client, string requestUri, HttpContent content)
+        private static async Task<HttpResponseMessage> PatchAsync(HttpClient discordHttpClient, string requestUri, HttpContent content)
         {
             try
             {
-                var requestMessage = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri)
+                var requestMessage = new HttpRequestMessage(PATCH, requestUri)
                 {
                     Content = content
                 };
 
-                return await client.SendAsync(requestMessage);
+                return await discordHttpClient.SendAsync(requestMessage);
             }
             catch (Exception ex)
             {

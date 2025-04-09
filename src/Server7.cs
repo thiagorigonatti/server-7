@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -124,27 +125,27 @@ namespace Server7
                 SteamUser steamUser = await Bot.FetchSteamAsync(clientInfo.PlatformId.ToString().Replace("Steam_", ""));
 
                 var embed = GetEmbedBuilder();
-                var channel = Bot.client.GetChannel(settings.ChatChannelId) as SocketTextChannel;
+                var channel = Bot.discordClient.GetChannel(settings.ChatChannelId) as SocketTextChannel;
 
                 switch (eventType)
                 {
                     case EventType.Spawn:
-                        embed.WithAuthor($"{steamUser.PersonaName} [{steamUser.Country}] {settings.JoinMessage}", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{steamUser.PersonaName} {settings.JoinMessage}", steamUser.Avatar, steamUser.ProfileUrl)
                              .WithColor(Color.Green);
                         break;
 
                     case EventType.Leave:
-                        embed.WithAuthor($"{steamUser.PersonaName} [{steamUser.Country}] {settings.LeaveMessage}", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{steamUser.PersonaName} {settings.LeaveMessage}", steamUser.Avatar, steamUser.ProfileUrl)
                              .WithColor(Color.LighterGrey);
                         break;
 
                     case EventType.Death:
-                        embed.WithAuthor($"{steamUser.PersonaName} [{steamUser.Country}] {settings.DeathMessage}", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{steamUser.PersonaName} {settings.DeathMessage}", steamUser.Avatar, steamUser.ProfileUrl)
                              .WithColor(Color.DarkRed);
                         break;
 
                     case EventType.Chat:
-                        embed.WithAuthor($"{steamUser.PersonaName} [{steamUser.Country}] :", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{steamUser.PersonaName}:", steamUser.Avatar, steamUser.ProfileUrl)
                              .WithDescription(message)
                              .WithColor(Color.Gold);
                         break;
@@ -279,11 +280,19 @@ namespace Server7
             {
                 string previousStatus = string.Empty;
 
+                HttpClient discordHttpClient = new HttpClient();
+                discordHttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", settings.BotToken);
+                var requestBody = new
+                {
+                    description = "Developed by TheCoders™:\nhttps://discord.gg/ntaUvVKYRC"
+                };
+                var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
+
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     if (gameStartDone)
                     {
-                        Bot.SetAppDescription();
+                        Bot.SetAppDescription(discordHttpClient, content);
                         double percent = GameManager.Instance.World.worldTime / 1000D;
                         int minutes = (int)(percent * 60);
                         int finalMinutes = minutes % 60;
@@ -300,7 +309,7 @@ namespace Server7
                         if (!previousStatus.Equals(newStatus))
                         {
                             previousStatus = newStatus;
-                            await Bot.client.SetCustomStatusAsync(previousStatus);
+                            await Bot.discordClient.SetCustomStatusAsync(previousStatus);
                         }
                     }
 
@@ -324,7 +333,7 @@ namespace Server7
                     .ToList();
 
                 if (!logFiles.Any())
-                    return "Nenhum arquivo 'output_log_' encontrado.";
+                    return "No 'output_log_' file found.";
 
                 var latestLogFile = logFiles.First().FullName;
                 var latestLogFileName = logFiles.First().Name;
@@ -343,7 +352,7 @@ namespace Server7
                     }
                 }
 
-                return $"Versão não encontrada em {Path.GetFileName(latestLogFile)}";
+                return $"Version not found in {Path.GetFileName(latestLogFile)}";
             }
             catch (Exception ex)
             {
@@ -356,8 +365,6 @@ namespace Server7
         {
             try
             {
-                HttpClient httpClient = new HttpClient();
-
                 string[] data = GetVersion().Split('=');
                 var requestBody = new
                 {
@@ -367,12 +374,12 @@ namespace Server7
 
                 var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
 
-                var requestMessage = new HttpRequestMessage(new HttpMethod("POST"), requestUri)
+                var requestMessage = new HttpRequestMessage(HttpMethod.Post, requestUri)
                 {
                     Content = content
                 };
 
-                return await httpClient.SendAsync(requestMessage);
+                return await Bot.STATIC_HTTP_CLIENT.SendAsync(requestMessage);
             }
             catch (Exception ex)
             {
