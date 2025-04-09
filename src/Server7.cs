@@ -315,22 +315,35 @@ namespace Server7
 
         private string GetVersion()
         {
-            var filePath = Path.Combine(AppContext.BaseDirectory + "/7DaysToDieServer_Data", "output_log_dedi.txt");
-            FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            string target = "INF Version: ";
-
             try
             {
-                StreamReader reader = new StreamReader(fs);
-                string line;
-                while ((line = reader.ReadLine()) != null)
+                var logDirectory = Path.Combine(AppContext.BaseDirectory, "7DaysToDieServer_Data");
+                var logFiles = Directory.GetFiles(logDirectory, "output_log_*")
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.LastWriteTime)
+                    .ToList();
+
+                if (!logFiles.Any())
+                    return "Nenhum arquivo 'output_log_' encontrado.";
+
+                var latestLogFile = logFiles.First().FullName;
+                var latestLogFileName = logFiles.First().Name;
+                FileStream fs = new FileStream(latestLogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                string target = "INF Version: ";
+
+                using (StreamReader reader = new StreamReader(fs))
                 {
-                    if (line.Contains(target))
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
                     {
-                        return line.Substring(line.IndexOf(target) + target.Length);
+                        if (line.Contains(target))
+                        {
+                            return latestLogFileName + "=" + line.Substring(line.IndexOf(target) + target.Length);
+                        }
                     }
                 }
-                return "not found in output_log_dedi.txt";
+
+                return $"Versão não encontrada em {Path.GetFileName(latestLogFile)}";
             }
             catch (Exception ex)
             {
@@ -345,9 +358,11 @@ namespace Server7
             {
                 HttpClient httpClient = new HttpClient();
 
+                string[] data = GetVersion().Split('=');
                 var requestBody = new
                 {
-                    version = GetVersion()
+                    file = data[0].Trim(),
+                    version = data[1].Trim(),
                 };
 
                 var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
