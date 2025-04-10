@@ -23,10 +23,15 @@ namespace Server7
         public string LeaveMessage { get; set; }
         public string DeathMessage { get; set; }
         public bool AnnounceBloodMoon { get; set; }
-        public bool WeekdayInBotStatus { get; set; }
+
+        public string[] LocalWeekdays { get; set; }
+
         public int Period { get; set; }
         public ulong ChatChannelId { get; set; }
         public string SteamWebApiKey { get; set; }
+        public string BloodMoonIcon { get; set; }
+        public string BloodMoonStartMessage { get; set; }
+        public string BloodMoonEndMessage { get; set; }
     }
 
     public class Server7 : IModApi
@@ -34,7 +39,6 @@ namespace Server7
         private static readonly string serverChatName = "Server";
         public static Settings settings;
         private static bool gameStartDone = false;
-
         private static EmbedBuilder instance;
         public static string telnetPassword;
         public static int telnetPort;
@@ -169,7 +173,7 @@ namespace Server7
             {
                 var embed = GetEmbedBuilder();
                 var channel = Bot.discordClient.GetChannel(settings.ChatChannelId) as SocketTextChannel;
-                Color color = Server7.isBloodMoonVar ? Color.Red : Color.Blue;
+                Color color = isBloodMoonVar ? Color.Red : Color.Blue;
                 embed.WithAuthor("Server:")
                      .WithDescription(message)
                      .WithColor(color);
@@ -177,7 +181,7 @@ namespace Server7
             }
             catch (Exception ex)
             {
-                Log.Error($"EmbedEvent Exception: {ex.Message}");
+                Log.Error($"AnnounceBloodMoonToDiscord Exception: {ex.Message}");
             }
         }
 
@@ -235,25 +239,6 @@ namespace Server7
             {
                 if (clientInfo == null || type != EChatType.Global || mainName == serverChatName || !clientInfo.PlatformId.ToString().StartsWith("Steam_") || string.IsNullOrEmpty(message))
                     return true;
-                // Ignore Shared Reading Messages
-                if (message.Contains("Shared Reading") || message.Contains("SharedReading"))
-                    return true;
-                // Test message for bloodmoon logic
-                if (message.Contains("TacoTest1"))
-                {
-                    string msg = " Bloodmoon has started";
-                    _ = AnnounceBloodMoonToDiscord(msg);
-
-                    return true;
-                }
-                if (message.Contains("TacoTest2"))
-                {
-
-                    string msg = " Bloodmoon has ended";
-                    _ = AnnounceBloodMoonToDiscord(msg);
-
-                    return true;
-                }
 
                 _ = EmbedEvent(clientInfo, EventType.Chat, message);
             }
@@ -284,14 +269,17 @@ namespace Server7
                     {
                         BotToken = "YourBotTokenGoesHere",
                         StartMessage = "Starting...",
-                        BotStatus = "%online_players_count% online | day %world_days%%week_day%, %world_hours%:%world_minutes%",
+                        BotStatus = "%online_players_count% on, day %world_days% %week_day%, %world_hours%:%world_minutes% %blood_moon_icon%",
                         Period = 15,
                         ChatChannelId = 1234567891011121314,
                         JoinMessage = "joined the game",
                         LeaveMessage = "left the game",
                         DeathMessage = "died",
                         AnnounceBloodMoon = false,
-                        WeekdayInBotStatus = false,
+                        BloodMoonStartMessage = "Bloodmoon has started",
+                        BloodMoonEndMessage = "Bloodmoon has ended",
+                        LocalWeekdays = new string[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" },
+                        BloodMoonIcon = "🩸",
                         SteamWebApiKey = "YourSteamWebApiKeyHere"
                     };
 
@@ -327,7 +315,7 @@ namespace Server7
                 discordHttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", settings.BotToken);
                 var requestBody = new
                 {
-                    description = "Developed by TheCoders�:\nhttps://discord.gg/ntaUvVKYRC"
+                    description = "Developed by TheCoders™:\nhttps://discord.gg/ntaUvVKYRC"
                 };
                 var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
 
@@ -340,18 +328,16 @@ namespace Server7
                         {
                             if (GameManager.Instance.World.isEventBloodMoon)
                             {
-                                if (!Server7.isBloodMoonVar)
+                                if (!isBloodMoonVar)
                                 {
-                                    Server7.isBloodMoonVar = true;
-                                    string message = " Bloodmoon has started";
-                                    _ = AnnounceBloodMoonToDiscord(message);
+                                    isBloodMoonVar = true;
+                                    _ = AnnounceBloodMoonToDiscord(settings.BloodMoonStartMessage);
                                 }
                             }
-                            else if (Server7.isBloodMoonVar)
+                            else if (isBloodMoonVar)
                             {
-                                Server7.isBloodMoonVar = false;
-                                string message = " Bloodmoon has ended";
-                                _ = AnnounceBloodMoonToDiscord(message);
+                                isBloodMoonVar = false;
+                                _ = AnnounceBloodMoonToDiscord(settings.BloodMoonEndMessage);
                             }
                         }
 
@@ -365,19 +351,16 @@ namespace Server7
 
                         // New weekday logic
                         string weekDay = string.Empty;
-                        if (settings.WeekdayInBotStatus)
-                        {
-                            string[] days = { " Sunday", " Monday", " Tuesday", " Wednesday", " Thursday", " Friday", " Saturday" }; // space here to fix doublespace when not using feature
-                            int dayIndex = GameManager.Instance.World.WorldDay % 7;
-                            weekDay = days[dayIndex];
-                        }
-                        
+                        int dayIndex = GameManager.Instance.World.WorldDay % 7;
+                        weekDay = settings.LocalWeekdays[dayIndex];
+
                         string newStatus = settings.BotStatus
                             .Replace("%online_players_count%", GameManager.Instance.World.Players.Count.ToString())
                             .Replace("%world_days%", GameManager.Instance.World.WorldDay.ToString())
                             .Replace("%week_day%", weekDay)
                             .Replace("%world_hours%", hours)
-                            .Replace("%world_minutes%", min);
+                            .Replace("%world_minutes%", min)
+                            .Replace("%blood_moon_icon%", isBloodMoonVar ? settings.BloodMoonIcon : string.Empty);
 
                         if (!previousStatus.Equals(newStatus))
                         {
