@@ -132,7 +132,6 @@ namespace Server7
                 SteamUser steamUser = await Bot.FetchSteamAsync(clientInfo.PlatformId.ToString().Replace("Steam_", ""));
 
                 var embed = GetEmbedBuilder();
-                var channel = Bot.discordClient.GetChannel(settings.ChatChannelId) as SocketTextChannel;
 
                 switch (eventType)
                 {
@@ -158,7 +157,7 @@ namespace Server7
                         break;
                 }
 
-                await channel.SendMessageAsync(embed: embed.Build());
+                await Bot.socketTextChannel.SendMessageAsync(embed: embed.Build());
             }
             catch (Exception ex)
             {
@@ -172,12 +171,12 @@ namespace Server7
             try
             {
                 var embed = GetEmbedBuilder();
-                var channel = Bot.discordClient.GetChannel(settings.ChatChannelId) as SocketTextChannel;
+
                 Color color = isBloodMoonVar ? Color.Red : Color.Blue;
                 embed.WithAuthor("Server:")
                      .WithDescription(message)
                      .WithColor(color);
-                await channel.SendMessageAsync(embed: embed.Build());
+                await Bot.socketTextChannel.SendMessageAsync(embed: embed.Build());
             }
             catch (Exception ex)
             {

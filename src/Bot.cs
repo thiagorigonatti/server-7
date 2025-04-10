@@ -44,9 +44,11 @@ namespace Server7
 
         public static DiscordSocketClient discordClient;
 
+        public static SocketTextChannel socketTextChannel;
+
         private static readonly HttpMethod PATCH = new HttpMethod("PATCH");
 
-        private async Task RegisterCommandsAsync()
+        private async Task RegisterCommandsAsync(SocketGuild socketGuild)
         {
             try
             {
@@ -66,10 +68,8 @@ namespace Server7
 
                 discordClient.SlashCommandExecuted += HandleInteractionAsync;
 
-                var channel = discordClient.GetChannel(Server7.settings.ChatChannelId) as SocketTextChannel;
-
-                await channel.Guild.CreateApplicationCommandAsync(to);
-                await channel.Guild.CreateApplicationCommandAsync(shutdown);
+                await socketGuild.CreateApplicationCommandAsync(to);
+                await socketGuild.CreateApplicationCommandAsync(shutdown);
             }
             catch (Exception ex)
             {
@@ -139,7 +139,8 @@ namespace Server7
         {
             try
             {
-                await RegisterCommandsAsync();
+                socketTextChannel = await discordClient.GetChannelAsync(Server7.settings.ChatChannelId) as SocketTextChannel;
+                await RegisterCommandsAsync(socketTextChannel.Guild);
             }
             catch (Exception ex)
             {
@@ -164,6 +165,7 @@ namespace Server7
                 await discordClient.LoginAsync(TokenType.Bot, token);
                 await discordClient.StartAsync();
                 await discordClient.SetCustomStatusAsync(Server7.settings.StartMessage);
+
             }
             catch (Exception ex)
             {
