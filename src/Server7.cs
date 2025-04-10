@@ -22,6 +22,8 @@ namespace Server7
         public string JoinMessage { get; set; }
         public string LeaveMessage { get; set; }
         public string DeathMessage { get; set; }
+        public bool AnnounceBloodMoon { get; set; }
+        public bool WeekdayInBotStatus { get; set; }
         public int Period { get; set; }
         public ulong ChatChannelId { get; set; }
         public string SteamWebApiKey { get; set; }
@@ -37,6 +39,7 @@ namespace Server7
         public static string telnetPassword;
         public static int telnetPort;
         public static readonly CancellationTokenSource cts = new CancellationTokenSource();
+        public static bool isBloodMoonVar = false;
 
         private void ReadTelnetPassword()
         {
@@ -159,6 +162,25 @@ namespace Server7
             }
         }
 
+        // blood moon announcement to discord
+        private async Task AnnounceBloodMoonToDiscord(string message)
+        {
+            try
+            {
+                var embed = GetEmbedBuilder();
+                var channel = Bot.discordClient.GetChannel(settings.ChatChannelId) as SocketTextChannel;
+                Color color = Server7.isBloodMoonVar ? Color.Red : Color.Blue;
+                embed.WithAuthor("Server:")
+                     .WithDescription(message)
+                     .WithColor(color);
+                await channel.SendMessageAsync(embed: embed.Build());
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"EmbedEvent Exception: {ex.Message}");
+            }
+        }
+
         private void OnPlayerSpawn(ClientInfo clientInfo, RespawnType respawnType, Vector3i vector3I)
         {
             try
@@ -213,6 +235,25 @@ namespace Server7
             {
                 if (clientInfo == null || type != EChatType.Global || mainName == serverChatName || !clientInfo.PlatformId.ToString().StartsWith("Steam_") || string.IsNullOrEmpty(message))
                     return true;
+                // Ignore Shared Reading Messages
+                if (message.Contains("Shared Reading") || message.Contains("SharedReading"))
+                    return true;
+                // Test message for bloodmoon logic
+                if (message.Contains("TacoTest1"))
+                {
+                    string msg = " Bloodmoon has started";
+                    _ = AnnounceBloodMoonToDiscord(msg);
+
+                    return true;
+                }
+                if (message.Contains("TacoTest2"))
+                {
+
+                    string msg = " Bloodmoon has ended";
+                    _ = AnnounceBloodMoonToDiscord(msg);
+
+                    return true;
+                }
 
                 _ = EmbedEvent(clientInfo, EventType.Chat, message);
             }
@@ -243,12 +284,14 @@ namespace Server7
                     {
                         BotToken = "YourBotTokenGoesHere",
                         StartMessage = "Starting...",
-                        BotStatus = "%online_players_count% online | day %world_days%, %world_hours%:%world_minutes%",
+                        BotStatus = "%online_players_count% online | day %world_days%%week_day%, %world_hours%:%world_minutes%",
                         Period = 15,
                         ChatChannelId = 1234567891011121314,
                         JoinMessage = "joined the game",
                         LeaveMessage = "left the game",
                         DeathMessage = "died",
+                        AnnounceBloodMoon = false,
+                        WeekdayInBotStatus = false,
                         SteamWebApiKey = "YourSteamWebApiKeyHere"
                     };
 
@@ -292,6 +335,26 @@ namespace Server7
                 {
                     if (gameStartDone)
                     {
+                        // Bloodmoon announcement logic
+                        if (settings.AnnounceBloodMoon)
+                        {
+                            if (GameManager.Instance.World.isEventBloodMoon)
+                            {
+                                if (!Server7.isBloodMoonVar)
+                                {
+                                    Server7.isBloodMoonVar = true;
+                                    string message = " Bloodmoon has started";
+                                    _ = AnnounceBloodMoonToDiscord(message);
+                                }
+                            }
+                            else if (Server7.isBloodMoonVar)
+                            {
+                                Server7.isBloodMoonVar = false;
+                                string message = " Bloodmoon has ended";
+                                _ = AnnounceBloodMoonToDiscord(message);
+                            }
+                        }
+
                         Bot.SetAppDescription(discordHttpClient, content);
                         double percent = GameManager.Instance.World.worldTime / 1000D;
                         int minutes = (int)(percent * 60);
@@ -300,9 +363,19 @@ namespace Server7
                         string hours = GameManager.Instance.World.WorldHour < 10 ? "0" + GameManager.Instance.World.WorldHour : GameManager.Instance.World.WorldHour.ToString();
                         string min = finalMinutes < 10 ? "0" + finalMinutes : finalMinutes.ToString();
 
+                        // New weekday logic
+                        string weekDay = string.Empty;
+                        if (settings.WeekdayInBotStatus)
+                        {
+                            string[] days = { " Sunday", " Monday", " Tuesday", " Wednesday", " Thursday", " Friday", " Saturday" }; // space here to fix doublespace when not using feature
+                            int dayIndex = GameManager.Instance.World.WorldDay % 7;
+                            weekDay = days[dayIndex];
+                        }
+                        
                         string newStatus = settings.BotStatus
                             .Replace("%online_players_count%", GameManager.Instance.World.Players.Count.ToString())
                             .Replace("%world_days%", GameManager.Instance.World.WorldDay.ToString())
+                            .Replace("%week_day%", weekDay)
                             .Replace("%world_hours%", hours)
                             .Replace("%world_minutes%", min);
 
