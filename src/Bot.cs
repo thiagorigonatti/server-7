@@ -5,8 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Server7
@@ -187,7 +185,7 @@ namespace Server7
             return Task.CompletedTask;
         }
 
-        public static async Task<SteamUser> FetchSteamAsync(string steamId)
+        public static async Task<string> FetchSteamAvatarAsync(string steamId)
         {
             try
             {
@@ -202,7 +200,9 @@ namespace Server7
 
                     if (steamResponse?.Response?.Players != null && steamResponse.Response.Players.Count > 0)
                     {
-                        return steamResponse.Response.Players[0];
+                        string avatar =  steamResponse.Response.Players[0].Avatar;
+                        Server7.steamAvatarDict.Add(steamId, avatar);
+                        return avatar;
                     }
                     else
                     {
@@ -219,7 +219,7 @@ namespace Server7
             }
         }
 
-        public static async void SetAppDescription(HttpClient discordHttpClient, StringContent content)
+        public static async Task SetAppDescription(HttpClient discordHttpClient, StringContent content)
         {
             try
             {

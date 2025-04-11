@@ -1,5 +1,4 @@
 using Discord;
-using Discord.WebSocket;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -44,6 +43,7 @@ namespace Server7
         public static int telnetPort;
         public static readonly CancellationTokenSource cts = new CancellationTokenSource();
         public static bool isBloodMoonVar = false;
+        public static Dictionary<string, string> steamAvatarDict = new Dictionary<string, string>();
 
         private void ReadTelnetPassword()
         {
@@ -129,29 +129,31 @@ namespace Server7
         {
             try
             {
-                SteamUser steamUser = await Bot.FetchSteamAsync(clientInfo.PlatformId.ToString().Replace("Steam_", ""));
+                string steamId = clientInfo.PlatformId.ToString().Replace("Steam_", string.Empty);
+                string avatar = steamAvatarDict.ContainsKey(steamId) ? steamAvatarDict[steamId] : await Bot.FetchSteamAvatarAsync(steamId);
+                string profile = "https://steamcommunity.com/profiles/" + steamId;
 
                 var embed = GetEmbedBuilder();
 
                 switch (eventType)
                 {
                     case EventType.Spawn:
-                        embed.WithAuthor($"{steamUser.PersonaName} {settings.JoinMessage}", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{clientInfo.playerName} {settings.JoinMessage}", avatar, profile)
                              .WithColor(Color.Green);
                         break;
 
                     case EventType.Leave:
-                        embed.WithAuthor($"{steamUser.PersonaName} {settings.LeaveMessage}", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{clientInfo.playerName} {settings.LeaveMessage}", avatar, profile)
                              .WithColor(Color.LighterGrey);
                         break;
 
                     case EventType.Death:
-                        embed.WithAuthor($"{steamUser.PersonaName} {settings.DeathMessage}", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{clientInfo.playerName} {settings.DeathMessage}", avatar, profile)
                              .WithColor(Color.DarkRed);
                         break;
 
                     case EventType.Chat:
-                        embed.WithAuthor($"{steamUser.PersonaName}:", steamUser.Avatar, steamUser.ProfileUrl)
+                        embed.WithAuthor($"{clientInfo.playerName}:", avatar, profile)
                              .WithDescription(message)
                              .WithColor(Color.Gold);
                         break;
@@ -239,7 +241,17 @@ namespace Server7
                 if (clientInfo == null || type != EChatType.Global || mainName == serverChatName || !clientInfo.PlatformId.ToString().StartsWith("Steam_") || string.IsNullOrEmpty(message))
                     return true;
 
-                _ = EmbedEvent(clientInfo, EventType.Chat, message);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await EmbedEvent(clientInfo, EventType.Chat, message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error($"EmbedEvent async error: {ex.Message}");
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -340,7 +352,7 @@ namespace Server7
                             }
                         }
 
-                        Bot.SetAppDescription(discordHttpClient, content);
+                        await Bot.SetAppDescription(discordHttpClient, content);
                         double percent = GameManager.Instance.World.worldTime / 1000D;
                         int minutes = (int)(percent * 60);
                         int finalMinutes = minutes % 60;
