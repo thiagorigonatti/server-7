@@ -231,10 +231,9 @@ namespace Server7
             catch (Exception ex)
             {
                 Server7.cts.Cancel();
-                Log.Error($"SetAppDescription Exception: {ex.Message}");
-                Log.Error("This may be happened due to an invalid BotToken in Server7/Config/settings.json");
-                Log.Error("ShuttingDown Now.");
-                new TelnetClient("localhost", Server7.telnetPort).Shutdown7d2dServer(Server7.telnetPassword);
+                Log.Warning($"SetAppDescription Exception: {ex.Message}");
+                Log.Warning("This may be happened due to an invalid BotToken in Server7/Config/settings.json");
+                Log.Warning("But it could happen if discord bot suddenly disconnects for a short period or lag");
             }
         }
 
