@@ -5,6 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Runtime;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Server7
@@ -139,6 +142,17 @@ namespace Server7
             {
                 socketTextChannel = await discordClient.GetChannelAsync(Server7.settings.ChatChannelId) as SocketTextChannel;
                 await RegisterCommandsAsync(socketTextChannel.Guild);
+
+                HttpClient discordHttpClient = new HttpClient();
+                discordHttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", Server7.settings.BotToken);
+                var requestBody = new
+                {
+                    description = "Developed by TheCoders™:\nhttps://discord.gg/pP5hEQNbjT"
+                };
+                var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
+
+                await Bot.SetAppDescription(discordHttpClient, content);
+
             }
             catch (Exception ex)
             {
@@ -175,7 +189,7 @@ namespace Server7
         {
             try
             {
-                Log.Out(arg.Message);
+                Log.Warning(arg.Message);
             }
             catch (Exception ex)
             {

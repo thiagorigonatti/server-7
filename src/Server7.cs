@@ -138,17 +138,20 @@ namespace Server7
                 switch (eventType)
                 {
                     case EventType.Spawn:
-                        embed.WithAuthor($"{clientInfo.playerName} {settings.JoinMessage}", avatar, profile)
+                        embed.WithAuthor($"{clientInfo.playerName}", avatar, profile)
+                             .WithDescription(settings.JoinMessage)
                              .WithColor(Color.Green);
                         break;
 
                     case EventType.Leave:
-                        embed.WithAuthor($"{clientInfo.playerName} {settings.LeaveMessage}", avatar, profile)
+                        embed.WithAuthor($"{clientInfo.playerName}", avatar, profile)
+                             .WithDescription(settings.LeaveMessage)
                              .WithColor(Color.LighterGrey);
                         break;
 
                     case EventType.Death:
-                        embed.WithAuthor($"{clientInfo.playerName} {settings.DeathMessage}", avatar, profile)
+                        embed.WithAuthor($"{clientInfo.playerName}", avatar, profile)
+                             .WithDescription(settings.DeathMessage)
                              .WithColor(Color.DarkRed);
                         break;
 
@@ -307,7 +310,7 @@ namespace Server7
                     await new Bot().RunBotAsync(settings.BotToken);
                 });
 
-                var task = RunEvery10SecondsAsync(cts.Token);
+                var task = RunEveryXSecondsAsync(cts.Token);
                 await task;
             }
             catch (Exception ex)
@@ -316,19 +319,11 @@ namespace Server7
             }
         }
 
-        private async Task RunEvery10SecondsAsync(CancellationToken cancellationToken)
+        private async Task RunEveryXSecondsAsync(CancellationToken cancellationToken)
         {
             try
             {
                 string previousStatus = string.Empty;
-
-                HttpClient discordHttpClient = new HttpClient();
-                discordHttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bot", settings.BotToken);
-                var requestBody = new
-                {
-                    description = "Developed by TheCoders™:\nhttps://discord.gg/ntaUvVKYRC"
-                };
-                var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -352,7 +347,6 @@ namespace Server7
                             }
                         }
 
-                        await Bot.SetAppDescription(discordHttpClient, content);
                         double percent = GameManager.Instance.World.worldTime / 1000D;
                         int minutes = (int)(percent * 60);
                         int finalMinutes = minutes % 60;
@@ -385,7 +379,7 @@ namespace Server7
             }
             catch (Exception ex)
             {
-                Log.Error($"RunEvery10SecondsAsync Exception: {ex.Message}");
+                Log.Error($"RunEveryXSecondsAsync Exception: {ex.Message}");
             }
         }
 
