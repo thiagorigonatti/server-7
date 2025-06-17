@@ -104,7 +104,7 @@ namespace Server7
             }
         }
 
-        private void OnGameStartDone()
+        private void OnGameStartDone(ref ModEvents.SGameStartDoneData data)
         {
             try
             {
@@ -189,8 +189,12 @@ namespace Server7
             }
         }
 
-        private void OnPlayerSpawn(ClientInfo clientInfo, RespawnType respawnType, Vector3i vector3I)
+        private void OnPlayerSpawn(ref ModEvents.SPlayerSpawnedInWorldData data)
         {
+
+            ClientInfo clientInfo = data.ClientInfo;
+            RespawnType respawnType = data.RespawnType;
+
             try
             {
                 if (clientInfo == null || (respawnType != RespawnType.JoinMultiplayer && respawnType != RespawnType.EnterMultiplayer) || !clientInfo.PlatformId.ToString().StartsWith("Steam_"))
@@ -205,8 +209,11 @@ namespace Server7
             }
         }
 
-        private void OnPlayerDisconnect(ClientInfo clientInfo, bool s)
+        private void OnPlayerDisconnect(ref ModEvents.SPlayerDisconnectedData data)
         {
+
+            ClientInfo clientInfo = data.ClientInfo;
+
             try
             {
                 if (clientInfo == null || !clientInfo.PlatformId.ToString().StartsWith("Steam_"))
@@ -220,12 +227,16 @@ namespace Server7
             }
         }
 
-        private bool OnPlayerDeath(ClientInfo clientInfo, EnumGameMessages enumGameMessages, string str1, string str2, string str3)
+        private ModEvents.EModEventResult OnPlayerDeath(ref ModEvents.SGameMessageData data)
         {
+
+            ClientInfo clientInfo = data.ClientInfo;
+            EnumGameMessages enumGameMessages = data.MessageType;
+
             try
             {
                 if (enumGameMessages != EnumGameMessages.EntityWasKilled || clientInfo == null || !clientInfo.PlatformId.ToString().StartsWith("Steam_"))
-                    return true;
+                    return ModEvents.EModEventResult.StopHandlersRunVanilla;
 
                 _ = EmbedEvent(clientInfo, EventType.Death, null);
             }
@@ -234,15 +245,22 @@ namespace Server7
                 Log.Error($"OnPlayerDeath Exception: {ex.Message}");
             }
 
-            return true;
+            return ModEvents.EModEventResult.StopHandlersRunVanilla;
         }
 
-        private bool OnPlayerChat(ClientInfo clientInfo, EChatType type, int senderId, string message, string mainName, List<int> recipientEntityIds)
+        private ModEvents.EModEventResult OnPlayerChat(ref ModEvents.SChatMessageData data)
         {
+
+
+            ClientInfo clientInfo = data.ClientInfo;
+            EChatType type = data.ChatType;
+            string mainName = data.MainName;
+            string message = data.Message;
+
             try
             {
                 if (clientInfo == null || type != EChatType.Global || mainName == serverChatName || !clientInfo.PlatformId.ToString().StartsWith("Steam_") || string.IsNullOrEmpty(message))
-                    return true;
+                    return ModEvents.EModEventResult.StopHandlersRunVanilla;
 
                 _ = Task.Run(async () =>
                 {
@@ -260,7 +278,7 @@ namespace Server7
             {
                 Log.Error($"OnPlayerChat Exception: {ex.Message}");
             }
-            return true;
+            return ModEvents.EModEventResult.StopHandlersRunVanilla;
         }
 
         public async void InitMod(Mod mod)
@@ -387,14 +405,14 @@ namespace Server7
         {
             try
             {
-                var logDirectory = Path.Combine(AppContext.BaseDirectory, "7DaysToDieServer_Data");
+                var logDirectory = Path.Combine(AppContext.BaseDirectory);
                 var logFiles = Directory.GetFiles(logDirectory, "output_log_*")
                     .Select(f => new FileInfo(f))
                     .OrderByDescending(f => f.LastWriteTime)
                     .ToList();
 
                 if (!logFiles.Any())
-                    return "No 'output_log_' file found.";
+                    return "'output_log_' file not found.";
 
                 var latestLogFile = logFiles.First().FullName;
                 var latestLogFileName = logFiles.First().Name;

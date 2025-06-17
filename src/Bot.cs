@@ -108,7 +108,7 @@ namespace Server7
                         {
                             if (Server7.telnetPassword == null || Server7.telnetPort == 0)
                             {
-                                await command.RespondAsync(text: "Check whether telnet is enabled and password and port is set\nif not, shutdown command issued from discord won't work");
+                                await command.RespondAsync(text: "Check whether telnet is enabled and password and port is set\notherwise, shutdown command issued from discord won't work");
                                 return;
                             }
 
